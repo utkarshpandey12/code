@@ -12,6 +12,8 @@ Steps to run the code
 3. cd code folder 
 
 4. run command
+
+
 aws cloudformation package
 --template-file demo-app-cloudformation-template.sam.yaml
 --s3-bucket NewsDemoApp
