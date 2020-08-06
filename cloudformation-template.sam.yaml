@@ -1,0 +1,241 @@
+﻿AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  ServiceName:
+    Type: "String"
+    AllowedPattern: "^[a-zA-Z0-9]+[a-zA-Z0-9-]+[a-zA-Z0-9]+$"
+    Default: "news-app"
+  Environment:
+    Type: String
+    Default: "dev"
+  HostName:
+    Type: String
+    Default: "test"
+  DataBaseName:
+    Type: String
+    Default: "test"
+  PortNumber:
+    Type: Number
+    Default: "1234"
+  UserName:
+    Type: String
+    Default: "username"
+  PassWord:
+    Type: String
+  ApiKey:
+    Type: String
+  NewsTableName:
+    Type: String    
+  DatadogMonitored:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+Conditions:
+  DatadogMonitored: !Equals [ !Ref DatadogMonitored, true ]
+Resources:
+  MyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "${ServiceName}-${Environment}"
+      StageName: !Sub "${Environment}"
+      Auth:
+        DefaultAuthorizer: 'AWS_IAM'
+        AddDefaultAuthorizerToCorsPreflight: False
+      Cors:
+        AllowMethods: "'POST, GET, OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      DefinitionBody:
+        swagger: '2.0'
+        basePath: !Sub '/${Environment}'
+        schemes:
+          - 'https'
+        x-amazon-apigateway-gateway-responses:
+          DEFAULT_4XX:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+          DEFAULT_5XX:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        paths:
+          /resume:
+            options:
+              summary: CORS support
+              description: |
+                Enable CORS by returning correct headers
+              consumes:
+                - application/json
+              produces:
+                - application/json
+              tags:
+                - CORS
+              security:
+                - NONE: []
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: |
+                    {
+                      "statusCode" : 200
+                    }
+                responses:
+                  "default":
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-amz-security-token'"
+                      method.response.header.Access-Control-Allow-Methods: "'*'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                    responseTemplates:
+                      application/json: |
+                        {}
+              responses:
+                "200":
+                  description: Default response for CORS method
+                  headers:
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+            get:
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: Default response for CORS method
+                  headers:
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                uri: !Sub
+                  - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations"
+                  - lambdaArn: !GetAtt "LambdaFunction.Arn"
+                responses:
+                  "default":
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-amz-security-token'"
+                      method.response.header.Access-Control-Allow-Methods: "'*'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                httpMethod: "POST"
+                credentials: !GetAtt "ApiIAMRole.Arn"
+                type: "AWS_PROXY"
+            post:
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: Default response for CORS method
+                  headers:
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Origin:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                uri: !Sub
+                  - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations"
+                  - lambdaArn: !GetAtt "LambdaFunction.Arn"
+                responses:
+                  "default":
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-amz-security-token'"
+                      method.response.header.Access-Control-Allow-Methods: "'*'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                httpMethod: "POST"
+                credentials: !GetAtt "ApiIAMRole.Arn"
+                type: "AWS_PROXY"
+  ApiGatewayInvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt "LambdaFunction.Arn"
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join [
+        "", [
+        "arn:aws:execute-api:",
+        {"Ref": "AWS::Region"}, ":",
+        {"Ref": "AWS::AccountId"}, ":",
+        !Ref MyApi, "/*/*/*"]]
+  ApiIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaRole'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "apigateway.amazonaws.com"
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ServiceName}-${Environment}"
+      Handler: lambda_function.lambda_handler
+      Timeout: 60
+      CodeUri: .
+      Runtime: "python3.8"
+      Environment:
+        Variables:
+          HOST: !Ref HostName
+          PORT: !Ref PortNumber
+          DBNAME: !Ref DataBaseName
+          USER: !Ref UserName
+          PASSWORD: !Ref PassWord
+          APIKEY: !Ref ApiKey
+          NEWS_TABLE_NAME: !Ref NewsTableName
+      Role: !GetAtt "LambdaIAMRole.Arn"
+      Tags:
+        datadog:
+          !If [DatadogMonitored, "monitored", "unmonitored"]
+  LambdaIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      Policies:
+        - PolicyName: !Ref "ServiceName"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:DescribeParameters
+                  - ssm:GetParameters
+                  - ssm:GetParameter
+                  - ssm:GetParametersByPath
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                    - s3:ListBucket
+                    - s3:GetObject
+                    - s3:PutObject
+                Resource: "arn:aws:s3:::NewsDemoApp/*"
+Outputs:
+    LambdaArn:
+        Value: !GetAtt "LambdaFunction.Arn"
+                
