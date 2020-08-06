@@ -18,6 +18,10 @@ aws cloudformation package
 --output-template-file .demo-app-cloudformation-template.yaml
 
 5  run command after replacing all the relevant details in the command like dbname , username and google news api key etc.Environment and service name as it is
+
+
+
+
 aws cloudformation deploy
 --template-file .demo-app-cloudformation-template.yaml
 --capabilities CAPABILITY_NAMED_IAM
